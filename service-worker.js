@@ -5,6 +5,8 @@ const URLS_TO_CACHE = [
   '/index.html',
   '/index.tsx',
   '/manifest.webmanifest',
+  '/icon-192.svg',
+  '/icon-512.svg',
   'https://cdn.tailwindcss.com',
   'https://aistudiocdn.com/react@^19.2.0',
   'https://aistudiocdn.com/react-dom@^19.2.0/'
