@@ -1,0 +1,5 @@
+{
+  "name": "Magic Wand Bild-Editor",
+  "description": "Eine Webanwendung, mit der Benutzer Bilder hochladen, Bereiche mit einem 'Zauberstab'-Werkzeug auswählen, isolieren, skalieren und das Endergebnis als PNG-Datei herunterladen können.",
+  "requestFramePermissions": []
+}
