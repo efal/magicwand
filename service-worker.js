@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'magic-wand-editor-v3'; // Cache-Version erhöht für Update
+const CACHE_NAME = 'magic-wand-editor-v4'; // Cache-Version erhöht für Update
 const URLS_TO_CACHE = [
   '/',
   '/index.html',
@@ -15,7 +15,8 @@ const URLS_TO_CACHE = [
   // Externe Abhängigkeiten
   'https://cdn.tailwindcss.com',
   'https://aistudiocdn.com/react@^19.2.0',
-  'https://aistudiocdn.com/react-dom@^19.2.0/'
+  'https://aistudiocdn.com/react-dom@^19.2.0/client', // Korrekter Pfad für ReactDOM
+  'https://aistudiocdn.com/react@^19.2.0/jsx-runtime' // Benötigt für JSX
 ];
 
 // Installiert den Service Worker
@@ -24,10 +25,7 @@ self.addEventListener('install', event => {
     caches.open(CACHE_NAME)
       .then(cache => {
         console.log('Cache geöffnet');
-        // Das Hinzufügen von URLs mit unklaren Pfaden (wie react-dom/) kann fehlschlagen.
-        // Wir filtern sie und gehen davon aus, dass der Browser sie bei Bedarf zwischenspeichert.
-        const urlsWithExactPaths = URLS_TO_CACHE.filter(url => !url.endsWith('/'));
-        return cache.addAll(urlsWithExactPaths);
+        return cache.addAll(URLS_TO_CACHE);
       })
       .then(() => self.skipWaiting()) // Aktiviert den neuen Service Worker sofort
       .catch(error => {
