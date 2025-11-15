@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { CutIcon, DownloadIcon, ResetIcon, ScaleIcon, WandIcon, DownloadSVGIcon, InvertIcon, BrushIcon, OpacityIcon, FeatherIcon, TextIcon, FontSizeIcon } from './Icons';
+import { CutIcon, DownloadIcon, ResetIcon, ScaleIcon, WandIcon, DownloadSVGIcon, InvertIcon, BrushIcon, OpacityIcon, FeatherIcon, TextIcon, FontSizeIcon, AddIcon, SubtractIcon, NewSelectionIcon } from './Icons';
 
 interface ImageEditorProps {
   imageSrc: string;
@@ -9,6 +9,7 @@ interface ImageEditorProps {
 type Point = { x: number; y: number };
 type Bounds = { minX: number; minY: number; width: number; height: number; };
 type AppliedText = { text: string; color: string; size: number; pos: Point };
+type SelectionMode = 'new' | 'add' | 'subtract';
 
 const ControlSlider: React.FC<{
   id: string;
@@ -114,6 +115,7 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({ imageSrc, onReset }) =
   const [mousePos, setMousePos] = useState({ x: -100, y: -100 });
   const [isMouseInCanvas, setIsMouseInCanvas] = useState(false);
   const [canvasReady, setCanvasReady] = useState(false);
+  const [selectionMode, setSelectionMode] = useState<SelectionMode>('new');
 
   // Text tool state
   const [text, setText] = useState('Hallo Welt');
@@ -183,7 +185,7 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({ imageSrc, onReset }) =
       const startG = data[startPos + 1];
       const startB = data[startPos + 2];
       
-      const mask = new Uint8ClampedArray(width * height);
+      const newMask = new Uint8ClampedArray(width * height);
       const queue: Point[] = [{ x, y }];
       const visited = new Set<number>([y * width + x]);
 
@@ -199,7 +201,7 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({ imageSrc, onReset }) =
         const diff = Math.sqrt(Math.pow(r - startR, 2) + Math.pow(g - startG, 2) + Math.pow(b - startB, 2));
 
         if (diff <= tolerance) {
-          mask[curY * width + curX] = 1;
+          newMask[curY * width + curX] = 1;
           const neighbors: Point[] = [
             { x: curX + 1, y: curY }, { x: curX - 1, y: curY },
             { x: curX, y: curY + 1 }, { x: curX, y: curY - 1 },
@@ -214,7 +216,24 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({ imageSrc, onReset }) =
           }
         }
       }
-      setSelectionMask(mask);
+      
+      setSelectionMask(currentMask => {
+          if (selectionMode === 'add' && currentMask) {
+              const combinedMask = new Uint8ClampedArray(currentMask);
+              for (let i = 0; i < newMask.length; i++) {
+                  if (newMask[i] === 1) combinedMask[i] = 1;
+              }
+              return combinedMask;
+          }
+          if (selectionMode === 'subtract' && currentMask) {
+              const subtractedMask = new Uint8ClampedArray(currentMask);
+              for (let i = 0; i < newMask.length; i++) {
+                  if (newMask[i] === 1) subtractedMask[i] = 0;
+              }
+              return subtractedMask;
+          }
+          return newMask;
+      });
       setIsLoading(false);
     }, 50);
   };
@@ -321,7 +340,7 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({ imageSrc, onReset }) =
 }, [canvasReady, selectionMask, selectionOpacity, selectionBounds, appliedTexts, tool, text, textColor, fontSize, textPosition, mousePos, isMouseInCanvas]);
 
 
-  const drawOnMask = useCallback((p: Point, currentMask: Uint8ClampedArray) => {
+  const modifyMask = useCallback((p: Point, currentMask: Uint8ClampedArray, add: boolean) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const { width } = canvas;
@@ -333,7 +352,7 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({ imageSrc, onReset }) =
                 const px = p.x + j;
                 const py = p.y + i;
                 if (px >= 0 && px < canvas.width && py >= 0 && py < canvas.height) {
-                    currentMask[py * width + px] = 1;
+                    currentMask[py * width + px] = add ? 1 : 0;
                 }
             }
         }
@@ -352,9 +371,11 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({ imageSrc, onReset }) =
       const canvas = canvasRef.current;
       if (!canvas) return;
       const { width, height } = canvas;
-      const newMask = selectionMask ? new Uint8ClampedArray(selectionMask) : new Uint8ClampedArray(width * height);
-      drawOnMask(point, newMask);
-      setSelectionMask(newMask);
+      const baseMask = (selectionMode === 'new' || !selectionMask) ? new Uint8ClampedArray(width * height) : new Uint8ClampedArray(selectionMask);
+      
+      modifyMask(point, baseMask, selectionMode !== 'subtract');
+      
+      setSelectionMask(baseMask);
       lastPointRef.current = point;
     } else if (tool === 'text') {
       setTextPosition(point);
@@ -368,6 +389,7 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({ imageSrc, onReset }) =
       if (tool !== 'brush' || !isPainting || !point || croppedImageData) return;
       
       const newMask = new Uint8ClampedArray(selectionMask!);
+      const addToSelection = selectionMode !== 'subtract';
       
       if (lastPointRef.current) {
           const dist = Math.hypot(point.x - lastPointRef.current.x, point.y - lastPointRef.current.y);
@@ -376,10 +398,10 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({ imageSrc, onReset }) =
               const t = i / steps;
               const interpX = Math.round(lastPointRef.current.x * (1 - t) + point.x * t);
               const interpY = Math.round(lastPointRef.current.y * (1 - t) + point.y * t);
-              drawOnMask({x: interpX, y: interpY}, newMask);
+              modifyMask({x: interpX, y: interpY}, newMask, addToSelection);
           }
       } else {
-        drawOnMask(point, newMask);
+        modifyMask(point, newMask, addToSelection);
       }
       
       setSelectionMask(newMask);
@@ -652,6 +674,7 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({ imageSrc, onReset }) =
     setTolerance(20);
     setBrushSize(30);
     setTool('wand');
+    setSelectionMode('new');
     setSelectionOpacity(40);
     setEdgeSmoothing(2);
     setAppliedTexts([]);
@@ -671,7 +694,7 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({ imageSrc, onReset }) =
         )}
         {isMouseInCanvas && tool === 'brush' && !croppedImageData && (
             <div
-                className="rounded-full border border-cyan-400 bg-cyan-400/20 pointer-events-none absolute z-10"
+                className={`rounded-full border pointer-events-none absolute z-10 ${selectionMode === 'subtract' ? 'border-rose-500 bg-rose-500/20' : 'border-cyan-400 bg-cyan-400/20'}`}
                 style={{
                     width: brushSize,
                     height: brushSize,
@@ -702,6 +725,14 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({ imageSrc, onReset }) =
                 <button onClick={() => setTool('brush')} className={`px-4 py-1.5 rounded-md text-sm font-semibold w-full transition-colors ${tool === 'brush' ? 'bg-cyan-600 text-white' : 'text-slate-300 hover:bg-slate-700'}`}>Pinsel</button>
                 <button onClick={() => setTool('text')} className={`px-4 py-1.5 rounded-md text-sm font-semibold w-full transition-colors ${tool === 'text' ? 'bg-cyan-600 text-white' : 'text-slate-300 hover:bg-slate-700'}`}>Text</button>
               </div>
+
+              {(tool === 'wand' || tool === 'brush') && (
+                <div className="flex items-center justify-center p-1 bg-slate-900/70 rounded-lg gap-1">
+                  <button onClick={() => setSelectionMode('new')} title="Neue Auswahl" className={`p-2 rounded-md transition-colors ${selectionMode === 'new' ? 'bg-cyan-600 text-white' : 'text-slate-300 hover:bg-slate-700'}`}><NewSelectionIcon className="w-5 h-5"/></button>
+                  <button onClick={() => setSelectionMode('add')} title="Zur Auswahl hinzufügen" className={`p-2 rounded-md transition-colors ${selectionMode === 'add' ? 'bg-cyan-600 text-white' : 'text-slate-300 hover:bg-slate-700'}`}><AddIcon className="w-5 h-5"/></button>
+                  <button onClick={() => setSelectionMode('subtract')} title="Von Auswahl abziehen" className={`p-2 rounded-md transition-colors ${selectionMode === 'subtract' ? 'bg-cyan-600 text-white' : 'text-slate-300 hover:bg-slate-700'}`}><SubtractIcon className="w-5 h-5"/></button>
+                </div>
+              )}
 
               {tool === 'wand' && <ControlSlider id="tolerance" label="Toleranz" value={tolerance} min={0} max={100} step={1} onChange={e => setTolerance(Number(e.target.value))} icon={<WandIcon className="w-5 h-5"/>}/>}
               {tool === 'brush' && <ControlSlider id="brushSize" label="Pinselgröße" value={brushSize} min={2} max={100} step={1} onChange={e => setBrushSize(Number(e.target.value))} icon={<BrushIcon className="w-5 h-5"/>}/>}
