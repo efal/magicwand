@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'magic-wand-editor-v4'; // Cache-Version erhöht für Update
+const CACHE_NAME = 'magic-wand-editor-v5'; // Cache-Version erhöht für Update
 const URLS_TO_CACHE = [
   '/',
   '/index.html',
@@ -14,9 +14,9 @@ const URLS_TO_CACHE = [
   '/components/Icons.tsx',
   // Externe Abhängigkeiten
   'https://cdn.tailwindcss.com',
-  'https://aistudiocdn.com/react@^19.2.0',
-  'https://aistudiocdn.com/react-dom@^19.2.0/client', // Korrekter Pfad für ReactDOM
-  'https://aistudiocdn.com/react@^19.2.0/jsx-runtime' // Benötigt für JSX
+  'https://aistudiocdn.com/react@19.2.0',
+  'https://aistudiocdn.com/react-dom@19.2.0/client',
+  'https://aistudiocdn.com/react@19.2.0/jsx-runtime'
 ];
 
 // Installiert den Service Worker
