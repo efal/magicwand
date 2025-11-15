@@ -1,0 +1,23 @@
+{
+  "name": "Magic Wand Bild-Editor",
+  "short_name": "Magic Wand",
+  "description": "Eine Webanwendung, mit der Benutzer Bilder hochladen, Bereiche mit einem 'Zauberstab'-Werkzeug auswählen, isolieren, skalieren und das Endergebnis als PNG-Datei herunterladen können.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
