@@ -1,11 +1,21 @@
 
-const CACHE_NAME = 'magic-wand-editor-v2'; // Cache-Version erhöht, um ein Update zu erzwingen
+const CACHE_NAME = 'magic-wand-editor-v3'; // Cache-Version erhöht für Update
 const URLS_TO_CACHE = [
   '/',
   '/index.html',
   '/manifest.webmanifest',
   '/icon-192.svg',
-  '/icon-512.svg'
+  '/icon-512.svg',
+  // App-Komponenten
+  '/index.tsx',
+  '/App.tsx',
+  '/components/ImageUploader.tsx',
+  '/components/ImageEditor.tsx',
+  '/components/Icons.tsx',
+  // Externe Abhängigkeiten
+  'https://cdn.tailwindcss.com',
+  'https://aistudiocdn.com/react@^19.2.0',
+  'https://aistudiocdn.com/react-dom@^19.2.0/'
 ];
 
 // Installiert den Service Worker
@@ -14,9 +24,15 @@ self.addEventListener('install', event => {
     caches.open(CACHE_NAME)
       .then(cache => {
         console.log('Cache geöffnet');
-        return cache.addAll(URLS_TO_CACHE);
+        // Das Hinzufügen von URLs mit unklaren Pfaden (wie react-dom/) kann fehlschlagen.
+        // Wir filtern sie und gehen davon aus, dass der Browser sie bei Bedarf zwischenspeichert.
+        const urlsWithExactPaths = URLS_TO_CACHE.filter(url => !url.endsWith('/'));
+        return cache.addAll(urlsWithExactPaths);
       })
       .then(() => self.skipWaiting()) // Aktiviert den neuen Service Worker sofort
+      .catch(error => {
+        console.error('Service Worker Installation fehlgeschlagen:', error);
+      })
   );
 });
 
@@ -40,7 +56,7 @@ self.addEventListener('activate', event => {
 // Fängt Anfragen ab und wendet eine "Network First"-Strategie an
 self.addEventListener('fetch', event => {
   // Ignoriert Anfragen, die keine GET-Anfragen sind
-  if (event.request.method !== 'GET') {
+  if (event.request.method !== 'GET' || !event.request.url.startsWith('http')) {
       return;
   }
   
@@ -52,7 +68,10 @@ self.addEventListener('fetch', event => {
           const responseToCache = response.clone();
           caches.open(CACHE_NAME)
             .then(cache => {
-              cache.put(event.request, responseToCache);
+              // Vorsicht beim Caching von undurchsichtigen Antworten (z.B. von CDNs ohne CORS)
+              if (response.type !== 'opaque') {
+                cache.put(event.request, responseToCache);
+              }
             });
         }
         return response;
@@ -60,7 +79,17 @@ self.addEventListener('fetch', event => {
       .catch(() => {
         // Netzwerkanfrage fehlgeschlagen, versucht aus dem Cache zu laden
         console.log('Netzwerkanfrage fehlgeschlagen. Lade aus Cache für:', event.request.url);
-        return caches.match(event.request);
+        return caches.match(event.request).then(cachedResponse => {
+            if (cachedResponse) {
+                return cachedResponse;
+            }
+            // Wenn nichts im Cache ist, gib eine einfache Offline-Antwort zurück
+            // Dies ist besser als ein Browser-Fehler
+            if (event.request.destination === 'document') {
+                return caches.match('/');
+            }
+            return new Response(null, { status: 404, statusText: "Offline und nicht im Cache" });
+        });
       })
   );
 });
